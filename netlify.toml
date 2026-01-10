@@ -1,0 +1,27 @@
+# Netlify Configuration for FESEE Next.js App
+
+[build]
+  base = "frontend"
+  command = "npm run build"
+  publish = ".next"
+  
+[build.environment]
+  NODE_VERSION = "18"
+  NPM_VERSION = "9"
+
+# Next.js plugin for API routes support
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+
+# Headers for security and mobile compatibility
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    X-XSS-Protection = "1; mode=block"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    # CORS headers for mobile apps
+    Access-Control-Allow-Origin = "*"
+    Access-Control-Allow-Methods = "GET, POST, PUT, DELETE, OPTIONS"
+    Access-Control-Allow-Headers = "Content-Type, Authorization"

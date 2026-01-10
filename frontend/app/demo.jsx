@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { useWeb3 } from '../context/Web3Context';
-import ProtocolConsole from '../components/ProtocolConsole';
+import LoanManager from '../components/LoanManager';
+import CollateralManager from '../components/CollateralManager';
 import { 
   ShieldCheck, 
   Wallet, 
@@ -71,12 +72,26 @@ const Navbar = ({ onViewChange, currentView, web3 }) => {
 
         <div className="flex items-center gap-4">
           {currentView === 'landing' && (
-            <button 
-              onClick={() => onViewChange('console')}
-              className="hidden md:flex px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm font-medium transition items-center gap-2"
-            >
-              <Terminal size={14} /> Launch App
-            </button>
+            <>
+              <button 
+                onClick={() => onViewChange('manage')}
+                className="hidden md:flex px-4 py-2 rounded-lg bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white text-sm font-medium transition items-center gap-2 shadow-lg shadow-cyan-500/20"
+              >
+                <TrendingUp size={14} /> Manage Loans
+              </button>
+              <button 
+                onClick={() => onViewChange('collateral')}
+                className="hidden md:flex px-4 py-2 rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white text-sm font-medium transition items-center gap-2 shadow-lg shadow-purple-500/20"
+              >
+                <Layers size={14} /> Collateral NFT
+              </button>
+              <button 
+                onClick={() => onViewChange('console')}
+                className="hidden md:flex px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm font-medium transition items-center gap-2"
+              >
+                <Terminal size={14} /> Launch App
+              </button>
+            </>
           )}
           
           {/* Wallet Connection Button with Dropdown */}
@@ -452,7 +467,7 @@ const TeamView = () => {
 };
 
 // --- PAGE 3: CONSOLE APP VIEW ---
-const API_BASE = 'http://localhost:3001';
+const API_BASE = process.env.NEXT_PUBLIC_MOCK_API_URL || 'http://localhost:3001';
 
 const ConsoleView = ({ onNavigate, web3 }) => {
   const { 
@@ -601,7 +616,7 @@ const ConsoleView = ({ onNavigate, web3 }) => {
         body: JSON.stringify({
           amounts,
           revenueThreshold: 10000,
-          benfordThreshold: 20
+          benfordThreshold: 50
         })
       });
       
@@ -708,6 +723,7 @@ const ConsoleView = ({ onNavigate, web3 }) => {
 
   const handleBorrow = async () => {
     const amount = 500; // Demo amount
+    const termDays = 30; // Default 30 days
     
     if (!isConnected) {
       addLog('⚠️ Connect wallet to borrow', 'error');
@@ -720,17 +736,17 @@ const ConsoleView = ({ onNavigate, web3 }) => {
     }
 
     setIsLoading(true);
-    addLog(`Borrowing $${amount} USDC...`);
+    addLog(`Borrowing $${amount} USDC for ${termDays} days...`);
     
     try {
-      const result = await contractBorrow(amount);
+      const result = await contractBorrow(amount, termDays);
       if (result.success) {
         setLastTxHash(result.txHash);
         
         // Update local state immediately
         setBorrowed(prev => prev + amount);
         
-        addLog(`✅ Borrowed $${amount} successfully!`, 'success');
+        addLog(`✅ Borrowed $${amount} successfully for ${termDays} days!`, 'success');
         addLog(`TxHash: ${result.txHash}`, 'info');
         addLog(`📊 New borrowed amount: $${(borrowed + amount).toLocaleString()}`, 'info');
       }
@@ -965,9 +981,9 @@ const ConsoleView = ({ onNavigate, web3 }) => {
                     ? 'bg-gradient-to-r from-rose-500/10 to-orange-500/5 border-rose-500/30'
                     : 'bg-gradient-to-r from-amber-500/10 to-yellow-500/5 border-amber-500/30'
                 }`}>
-                  <div className="flex justify-between items-center">
+                  <div className="flex justify-center items-center">
                     <div>
-                      <div className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Credit Decision</div>
+                      <div className="text-[10px] text-slate-500 uppercase tracking-wider mb-1 text-center">Credit Decision</div>
                       <div className={`text-xl font-bold flex items-center gap-2 ${
                         scenarioData.decision === 'APPROVED' ? 'text-emerald-400' :
                         scenarioData.decision === 'REJECTED' ? 'text-rose-400' : 'text-amber-400'
@@ -975,12 +991,6 @@ const ConsoleView = ({ onNavigate, web3 }) => {
                         {scenarioData.decision === 'APPROVED' && <CheckCircle2 size={20} />}
                         {scenarioData.decision === 'REJECTED' && <AlertTriangle size={20} />}
                         {scenarioData.decision}
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Credit Limit</div>
-                      <div className="text-2xl font-bold font-mono text-white">
-                        ${scenarioData.creditLimit?.toLocaleString() || '0'}
                       </div>
                     </div>
                   </div>
@@ -1233,7 +1243,7 @@ const ConsoleView = ({ onNavigate, web3 }) => {
 
 // --- MAIN APP CONTAINER ---
 export default function StreamCreditApp() {
-  const [view, setView] = useState('landing'); // 'landing' | 'console' | 'team'
+  const [view, setView] = useState('landing'); // 'landing' | 'console' | 'manage' | 'collateral' | 'team'
   
   // Get Web3 context - must be inside Web3Provider (see layout.js)
   const web3Context = useWeb3();
@@ -1250,7 +1260,41 @@ export default function StreamCreditApp() {
         
         {/* VIEW SWITCHER */}
         {view === 'landing' && <LandingView onNavigate={setView} />}
-        {view === 'console' && <ProtocolConsole onBack={() => setView('landing')} web3={web3Context} />}
+        {view === 'console' && <ConsoleView onNavigate={setView} web3={web3Context} />}
+        {view === 'manage' && (
+          <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
+            <div className="container mx-auto px-6 py-12">
+              <div className="mb-8">
+                <button 
+                  onClick={() => setView('landing')}
+                  className="text-slate-400 hover:text-cyan-400 transition flex items-center gap-2 mb-4"
+                >
+                  <ArrowLeft size={16} /> Back to Home
+                </button>
+                <h1 className="text-4xl font-bold text-white mb-2">Loan Management</h1>
+                <p className="text-slate-400">Manage your loans with reverse interest curve and commitment fees</p>
+              </div>
+              <LoanManager />
+            </div>
+          </div>
+        )}
+        {view === 'collateral' && (
+          <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
+            <div className="container mx-auto px-6 py-12">
+              <div className="mb-8">
+                <button 
+                  onClick={() => setView('landing')}
+                  className="text-slate-400 hover:text-cyan-400 transition flex items-center gap-2 mb-4"
+                >
+                  <ArrowLeft size={16} /> Back to Home
+                </button>
+                <h1 className="text-4xl font-bold text-white mb-2">🏦 Collateral Tokenization</h1>
+                <p className="text-slate-400">Tokenize your assets from images with IPFS storage and file hash verification</p>
+              </div>
+              <CollateralManager />
+            </div>
+          </div>
+        )}
         {view === 'team' && <TeamView />}
 
         <Footer />

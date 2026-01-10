@@ -1,0 +1,8 @@
+{
+  "mockUSDC": "0x1d3ad3b9407891e19dB5981dfef13F4fC98fd21F",
+  "mockVerifier": "0x946580daCfE0C190064478c8A04D36ae1297d73C",
+  "streamCredit": "0xa1501cb1C5584b963CB63F6b5421Ef26224F2De1",
+  "invoiceNFT": "0x56Ab0F65234852BA5bA7793F33Fa559E94C14BfF",
+  "network": "sepolia",
+  "deployedAt": "2026-01-09T03:55:54.950Z"
+}

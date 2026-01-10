@@ -1,0 +1,11 @@
+{
+  "network": "sepolia",
+  "timestamp": "2026-01-09T07:30:30.598Z",
+  "deployer": "0xd387391F8C5018bb2da4486ed8DC4d1b9fa2705C",
+  "contracts": {
+    "MockUSDC": "0xF2349DF62365B214b5a8BD654D9CD8f47fe26009",
+    "MockVerifier": "0x1E2905cCc01D83DF8074BdBa8a8bf839B69e6fE3",
+    "StreamCredit": "0xD56e705D58F597B448610c17Da11598539917910",
+    "CollateralNFT": "0xae4857b09B590905A8eFc4AaDa4b169ACe335701"
+  }
+}

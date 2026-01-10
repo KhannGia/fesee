@@ -1,279 +1,253 @@
-# StreamCredit - ZK-Powered DeFi Lending Platform
+﻿#  FESEE - SME Credit Platform with Collateral Tokenization
 
-> Giải pháp cho vay phi tập trung kết hợp **Zero-Knowledge Proofs** và **Benford's Law** để xác thực dòng tiền doanh nghiệp.
+> **Nền tảng tín dụng cho doanh nghiệp vừa và nhỏ (SME) với token hóa tài sản thế chấp trên blockchain**
+
+Dự án FESEE là một giải pháp tín dụng phi tập trung sử dụng Zero-Knowledge Proof để xác minh doanh thu và NFT để token hóa tài sản thế chấp, giúp SME tiếp cận vốn dễ dàng hơn.
 
 ![License](https://img.shields.io/badge/license-MIT-blue)
 ![Node](https://img.shields.io/badge/node-%3E%3D18.0.0-green)
-![Solidity](https://img.shields.io/badge/solidity-0.8.19-orange)
+![Solidity](https://img.shields.io/badge/solidity-0.8.20-orange)
 
 ---
 
-## 🚀 Quick Start (5 phút setup)
+##  Mục lục
 
-### 1️⃣ Yêu cầu hệ thống
+- [Tính năng chính](#-tính-năng-chính)
+- [Kiến trúc hệ thống](#-kiến-trúc-hệ-thống)
+- [Công nghệ sử dụng](#-công-nghệ-sử-dụng)
+- [Cài đặt & Cấu hình](#-cài-đặt--cấu-hình)
+- [Hướng dẫn chạy](#-hướng-dẫn-chạy)
+- [Smart Contracts](#-smart-contracts)
+- [Đẩy lên GitHub](#-đẩy-lên-github)
 
-- **Node.js** >= 18.0.0 ([Download](https://nodejs.org/))
-- **npm** hoặc **yarn**
-- **MetaMask** browser extension
-- **Git** (để clone repo)
+---
 
-### 2️⃣ Clone & Install
+##  Tính năng chính
+
+### 1. **Zero-Knowledge Credit Verification**
+- Xác minh doanh thu mà không tiết lộ dữ liệu nhạy cảm
+- Sử dụng ZK-SNARK (Circom + SnarkJS)
+- Phân tích Benford's Law để phát hiện gian lận
+
+### 2. **Collateral NFT Tokenization**
+- Token hóa tài sản thế chấp thành NFT (ERC-721)
+- Lưu trữ hình ảnh tài sản trên IPFS (Thirdweb Storage)
+- Tính toán file hash (SHA-256) để chống trùng lặp
+- 7 loại tài sản: Máy móc, Hàng tồn kho, Bất động sản, Phương tiện, Hóa đơn, Khoản phải thu, Khác
+
+### 3. **Smart Lending System**
+- Vay USDC dựa trên credit limit
+- Lãi suất động theo kỳ hạn (7-365 ngày)
+- Commitment fee (1% credit limit)
+- Phí trả nợ sớm (early repayment bonus)
+
+### 4. **MongoDB Integration**
+- Lưu trữ lịch sử vay vốn
+- Quản lý collateral NFTs
+- API endpoints cho query nhanh
+- Dashboard analytics
+
+---
+
+##  Công nghệ sử dụng
+
+### Blockchain & Smart Contracts
+- **Solidity 0.8.20** - Smart contract language
+- **Hardhat** - Development environment
+- **Ethers.js v6** - Blockchain interaction
+- **Sepolia Testnet** - Deployment network
+
+### Frontend
+- **Next.js 14** - React framework (App Router)
+- **React 18** - UI library
+- **TailwindCSS** - Styling
+- **Recharts** - Data visualization
+
+### Database & Storage
+- **MongoDB Atlas** - NoSQL database
+- **Mongoose** - ODM for MongoDB
+- **Thirdweb Storage** - IPFS gateway
+
+### Zero-Knowledge Proofs
+- **Circom** - ZK circuit compiler
+- **SnarkJS** - ZK proof generation/verification
+- **Groth16** - Proving system
+
+---
+
+##  Cài đặt & Cấu hình
+
+### 1. Clone Repository
 
 ```bash
-# Clone repository
-git clone <repository-url>
-cd stream-credit
+git clone https://github.com/angianguyen/FESE.git
+cd fesee-main
+```
 
-# Install dependencies cho Frontend
+### 2. Cài đặt Dependencies
+
+#### Smart Contracts
+```bash
+cd contracts
+npm install
+```
+
+#### Frontend
+```bash
 cd frontend
 npm install
-
-# Install dependencies cho Mock API
-cd ../mock-api
-npm install
-
-# (Optional) Install dependencies cho Smart Contracts
-cd ../contracts
-npm install
 ```
 
-### 3️⃣ Chạy Mock API
+### 3. Cấu hình Environment Variables
 
-```bash
-cd mock-api
-npm start
+#### Frontend - Tạo file `frontend/.env.local`:
+
+```env
+# MongoDB Connection
+MONGODB_URI=mongodb+srv://<username>:<password>@cluster.mongodb.net/fesee?retryWrites=true&w=majority
+
+# Thirdweb IPFS Client ID (Get from: https://thirdweb.com/dashboard/settings/api-keys)
+NEXT_PUBLIC_THIRDWEB_CLIENT_ID=your_thirdweb_client_id
+
+# Contract Addresses (Sepolia Testnet)
+NEXT_PUBLIC_STREAM_CREDIT_ADDRESS=0xD56e705D58F597B448610c17Da11598539917910
+NEXT_PUBLIC_COLLATERAL_NFT_ADDRESS=0xae4857b09B590905A8eFc4AaDa4b169ACe335701
+NEXT_PUBLIC_MOCK_USDC_ADDRESS=0xF2349DF62365B214b5a8BD654D9CD8f47fe26009
+NEXT_PUBLIC_MOCK_VERIFIER_ADDRESS=0x1E2905cCc01D83DF8074BdBa8a8bf839B69e6fE3
+
+# API Base URL
+NEXT_PUBLIC_API_URL=http://localhost:3000
 ```
 
-Server chạy tại `http://localhost:3001`
+#### Contracts - Tạo file `contracts/.env`:
 
-### 4️⃣ Deploy Smart Contracts lên Sepolia
+```env
+# Sepolia RPC URL (Get from Alchemy/Infura)
+SEPOLIA_RPC_URL=https://eth-sepolia.g.alchemy.com/v2/your_api_key
+
+# Private Key (NEVER commit this!)
+PRIVATE_KEY=your_wallet_private_key_without_0x_prefix
+
+# Etherscan API Key (for verification)
+ETHERSCAN_API_KEY=your_etherscan_api_key
+```
+
+---
+
+##  Hướng dẫn chạy
+
+### A. Deploy Smart Contracts (Sepolia Testnet)
 
 ```bash
 cd contracts
-
-# Copy và cấu hình environment
-cp .env.example .env
-# Cập nhật SEPOLIA_RPC_URL, PRIVATE_KEY, ETHERSCAN_API_KEY
-
-# Compile contracts
-npm run compile
-
-# Deploy
-npm run deploy:sepolia
+npx hardhat compile
+npx hardhat run scripts/deploy-mock.js --network sepolia
 ```
 
-**Lưu ý**: Contract addresses sẽ được lưu trong `deployed-addresses.json`
+### B. Setup MongoDB
 
-### 5️⃣ Cấu hình Frontend
+1. Tạo tài khoản MongoDB Atlas: https://www.mongodb.com/cloud/atlas
+2. Tạo cluster mới (Free tier)
+3. Tạo database user
+4. Whitelist IP: `0.0.0.0/0` (cho development)
+5. Copy connection string vào `frontend/.env.local`
 
-Cập nhật contract addresses trong `frontend/config/constants.js`:
-
-```javascript
-export const CONTRACTS = {
-  streamCredit: '0xYourDeployedAddress',
-  mockUSDC: '0xYourMockUSDCAddress',
-  mockVerifier: '0xYourVerifierAddress',
-}
-```
-
-### 6️⃣ Chạy Frontend
+### C. Chạy Frontend
 
 ```bash
 cd frontend
 npm run dev
 ```
 
-Mở `http://localhost:3000`
+Mở browser tại: `http://localhost:3000`
 
-## 🎮 Demo Flow
-
-### Scenario 1: Honest Seller ✅
-
-1. Chọn **"Honest Seller"** scenario
-2. Hệ thống fetch 100 đơn hàng tuân theo Benford's Law
-3. Benford Score: **~8%** (thấp = tốt)
-4. Doanh thu: **$50,000**
-5. Click **"Xác thực & Cập nhật Credit Limit"**
-6. Contract cấp credit limit: **$15,000** (30% doanh thu)
-7. Click **"Vay $5,000"** hoặc **"Vay $10,000"**
-8. ✅ **Thành công!**
-
-### Scenario 2: Wash Trader ❌
-
-1. Chọn **"Wash Trader"** scenario
-2. Hệ thống fetch 100 đơn hàng có số tròn/lặp lại
-3. Benford Score: **~45%** (cao = nghi ngờ)
-4. Doanh thu: **$100,000** (nhưng không thực tế)
-5. Click **"Xác thực"**
-6. ⚠️ **Cảnh báo: "Phát hiện gian lận Wash Trading!"**
-7. ❌ **Từ chối cho vay**
-
-## 🔧 Chi tiết kỹ thuật
-
-### Mock API
-
-- **Framework**: Express.js
-- **Chức năng**: Giả lập API từ Shopee/TikTok Shop
-- **Endpoints**:
-  - `/api/user/honest` - Dữ liệu sạch
-  - `/api/user/fraud` - Dữ liệu wash trading
-- **Benford's Law**: Phát hiện số liệu bị bịa đặt
-
-### ZK Circuit
-
-- **Language**: Circom
-- **Library**: SnarkJS (Groth16)
-- **Private Inputs**: revenue, benfordScore
-- **Public Inputs**: revenueThreshold, fraudThreshold
-- **Output**: isValid (1 = pass, 0 = fail)
-
-**Note**: Trong demo này sử dụng MockVerifier, để production cần:
+### D. Chạy Mock API (Optional)
 
 ```bash
-cd zk-circuit
-npm run compile
-npm run setup
-npm run export-verifier  # Tạo Verifier.sol
+cd mock-api
+npm start
 ```
-
-### Smart Contracts
-
-**StreamCredit.sol**:
-- `verifyAndUpdateCredit()`: Verify ZK proof, cập nhật credit limit
-- `borrow()`: Vay tiền trong hạn mức
-- `repay()`: Trả nợ
-- `addLiquidity()`: Thêm thanh khoản (cho LP)
-
-**MockUSDC.sol**:
-- ERC20 token với 6 decimals
-- `faucet()`: Lấy test USDC
-
-### Frontend
-
-- **Framework**: Next.js 14
-- **Web3**: Wagmi + RainbowKit
-- **UI**: Tailwind CSS
-- **Features**:
-  - Wallet connection
-  - Real-time data fetching
-  - Benford Score calculation
-  - Contract interaction
-  - Transaction tracking
-
-## 📊 Tính năng nổi bật
-
-### 1. Benford's Law Fraud Detection
-
-```javascript
-// Phân phối chữ số đầu tiên tự nhiên
-[1: 30.1%, 2: 17.6%, 3: 12.5%, ..., 9: 4.6%]
-
-// Dữ liệu gian lận thường vi phạm quy luật này
-// Ví dụ: Nhiều số 1000, 5000, 10000 (wash trading)
-```
-
-### 2. Zero-Knowledge Proofs
-
-```
-Borrower chứng minh: "Doanh thu > $10k VÀ Benford Score < 15%"
-KHÔNG tiết lộ: Danh sách khách hàng, chi tiết đơn hàng
-```
-
-### 3. Dynamic Credit Limit
-
-```
-Credit Limit = Revenue × 30%
-Ví dụ: $50,000 revenue → $15,000 credit limit
-```
-
-## 🧪 Testing
-
-### Test Smart Contracts
-
-```bash
-cd contracts
-npm test
-```
-
-### Test ZK Circuit (sau khi compile)
-
-```bash
-cd zk-circuit
-npm run generate-proof
-npm run verify-proof
-```
-
-## 🌐 Deployment
-
-### Sepolia Testnet
-
-1. Get Sepolia ETH: [sepoliafaucet.com](https://sepoliafaucet.com)
-2. Deploy contracts: `npm run deploy:sepolia`
-3. Verify on Etherscan: `npm run verify:sepolia`
-4. Update frontend config
-5. Deploy frontend: Vercel/Netlify
-
-### Mainnet (Production)
-
-⚠️ **Cần thực hiện trước:**
-- [ ] Audit smart contracts
-- [ ] Setup real ZK verifier (không dùng mock)
-- [ ] Integrate real APIs (Shopee, TikTok Shop)
-- [ ] Implement liquidation mechanism
-- [ ] Setup Oracle (Chainlink)
-- [ ] Legal compliance check
-
-## 📚 Tài liệu tham khảo
-
-- **Benford's Law**: [Wikipedia](https://en.wikipedia.org/wiki/Benford%27s_law)
-- **Circom**: [circom.io](https://docs.circom.io/)
-- **Hardhat**: [hardhat.org](https://hardhat.org/)
-- **Wagmi**: [wagmi.sh](https://wagmi.sh/)
-
-## 🎯 Roadmap
-
-### Phase 1: MVP (Current) ✅
-- [x] Mock API with Benford's Law
-- [x] Basic ZK circuit
-- [x] Smart contracts on Sepolia
-- [x] Frontend demo
-
-### Phase 2: Enhanced Fraud Detection
-- [ ] Graph Network Analysis
-- [ ] Machine Learning scoring
-- [ ] Multi-source data validation
-
-### Phase 3: Advanced Features
-- [ ] Revenue Streaming (Superfluid)
-- [ ] Tranches (Junior/Senior)
-- [ ] NFT loan positions
-- [ ] Secondary market
-
-### Phase 4: Production
-- [ ] Real API integrations (OAuth)
-- [ ] Mainnet deployment
-- [ ] Institutional liquidity
-- [ ] Credit-Scoring-as-a-Service
-
-## 🤝 Contributing
-
-Dự án này được phát triển cho cuộc thi. Mọi đóng góp và feedback đều được hoan nghênh!
-
-## 📄 License
-
-MIT License
-
-## 🙏 Acknowledgments
-
-- **Goldfinch**: Inspiration for RWA lending
-- **Benford's Law**: Fraud detection methodology
-- **Circom Team**: ZK toolkit
-- **Ethereum Foundation**: Sepolia testnet
 
 ---
 
-**Built with ❤️ for FESE Hackathon**
+##  Smart Contracts
 
-Demo: [Your Demo URL]  
-Presentation: [Your Slides URL]  
-Contact: [Your Email]
+### Deployed Addresses (Sepolia Testnet)
+
+| Contract | Address | Purpose |
+|----------|---------|---------|
+| **StreamCredit** | `0xD56e705D58F597B448610c17Da11598539917910` | Lending protocol |
+| **CollateralNFT** | `0xae4857b09B590905A8eFc4AaDa4b169ACe335701` | NFT collateral |
+| **MockUSDC** | `0xF2349DF62365B214b5a8BD654D9CD8f47fe26009` | Test stablecoin |
+| **MockVerifier** | `0x1E2905cCc01D83DF8074BdBa8a8bf839B69e6fE3` | ZK proof verifier |
+
+---
+
+##  Đẩy lên GitHub
+
+### 1. Tạo file `.gitignore`
+
+```bash
+# Dependencies
+node_modules/
+
+# Environment Variables
+.env
+.env.local
+contracts/.env
+
+# Next.js
+.next/
+out/
+build/
+
+# Production
+*.log
+
+# Hardhat
+cache/
+artifacts/
+
+# ZK Circuit
+*.zkey
+*.r1cs
+*.wasm
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+```
+
+### 2. Git Commands
+
+```bash
+# Initialize Git
+git init
+
+# Add all files
+git add .
+
+# Commit
+git commit -m "feat: Complete FESEE platform with NFT collateral"
+
+# Add remote
+git remote add origin https://github.com/angianguyen/FESE.git
+
+# Push
+git branch -M main
+git push -u origin main
+```
+
+---
+
+##  Support
+
+- **GitHub**: https://github.com/angianguyen/FESE
+- **Issues**: https://github.com/angianguyen/FESE/issues
+
+---
+
+**Built with  by FESEE Team**

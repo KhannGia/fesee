@@ -31,7 +31,7 @@ contract MockUSDC is ERC20, Ownable {
      * @notice Faucet - Cho phép users lấy test USDC
      */
     function faucet(uint256 amount) external {
-        require(amount <= 10_000 * 10**_decimals, "Max 10k per request");
+        // No limit for testing - allow contracts to mint any amount
         _mint(msg.sender, amount);
     }
 }

@@ -1,0 +1,12 @@
+services:
+  # Backend API - Web Service
+  - type: web
+    name: fese-api
+    env: node
+    region: oregon
+    buildCommand: cd mock-api && yarn install
+    startCommand: cd mock-api && yarn start
+    envVars:
+      - key: NODE_ENV
+        value: production
+

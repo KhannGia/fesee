@@ -63,7 +63,7 @@ function calculateBenfordScore(orderAmounts) {
  * @param {number} benfordThreshold - Maximum allowed Benford score (e.g., 20)
  * @returns {Promise<{proof, publicSignals}>}
  */
-export async function generateProof(orderAmounts, revenueThreshold = 500000, benfordThreshold = 20) {
+export async function generateProof(orderAmounts, revenueThreshold = 500000, benfordThreshold = 50) {
   try {
     console.log('🔐 Starting ZK proof generation...');
     console.log('Orders count:', orderAmounts.length);

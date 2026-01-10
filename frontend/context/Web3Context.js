@@ -7,21 +7,12 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { ethers } from 'ethers';
-import { STREAM_CREDIT_ABI } from '../config/abi';
+import { STREAM_CREDIT_ABI, COLLATERAL_NFT_ABI } from '../config/abi';
+import { CONTRACTS } from '../config/constants';
+import { createLoan, updateLoan } from '../hooks/useLoanHistory';
+import { createCollateral, updateCollateral } from '../hooks/useCollateralHistory';
 
-// Contract addresses from deployed-addresses-mock.json (MockVerifier - for testing)
-// For production with real ZK proofs, use deployed-addresses.json with Groth16Verifier
-const CONTRACTS = {
-  // MockVerifier deployment (for demo - always accepts proofs)
-  streamCredit: '0xCF2a831E6D389974992F9b4fc20f9B45fDd95475',
-  mockUSDC: '0x25117A7cd454E8C285553f0629696a28bAB3356c',
-  mockVerifier: '0x1e1247d2458FDb5E82CA7e2dd7A30360E7c399BF',
-  
-  // Real Verifier deployment (requires real ZK proofs)
-  // streamCredit: '0x2F90F76F1D3fCD66c92Ab00DCDa1e7C5A61200b9',
-  // mockUSDC: '0x2b1561Ef1C3bE02180A32E7aae6A7566Ed8F27a8',
-  // groth16Verifier: '0xCAecEC1e406B524fDa7C29424AEcD5dB6FBa896b'
-};
+// Contract addresses now imported from config/constants.js
 
 // Sepolia Chain ID
 const SEPOLIA_CHAIN_ID = 11155111;
@@ -45,6 +36,7 @@ export function Web3Provider({ children }) {
   const [isConnecting, setIsConnecting] = useState(false);
   const [error, setError] = useState(null);
   const [streamCreditContract, setStreamCreditContract] = useState(null);
+  const [collateralNFT, setCollateralNFT] = useState(null);
   const [allAccounts, setAllAccounts] = useState([]); // Track all connected accounts
 
   // Check if MetaMask is installed
@@ -79,15 +71,22 @@ export function Web3Provider({ children }) {
     }
   }, []);
 
-  // Initialize contract when signer is available
+  // Initialize contracts when signer is available
   useEffect(() => {
     if (signer) {
-      const contract = new ethers.Contract(
+      const streamContract = new ethers.Contract(
         CONTRACTS.streamCredit,
         STREAM_CREDIT_ABI,
         signer
       );
-      setStreamCreditContract(contract);
+      setStreamCreditContract(streamContract);
+      
+      const collateralContract = new ethers.Contract(
+        CONTRACTS.collateralNFT,
+        COLLATERAL_NFT_ABI,
+        signer
+      );
+      setCollateralNFT(collateralContract);
     }
   }, [signer]);
 
@@ -166,6 +165,7 @@ export function Web3Provider({ children }) {
     setAccount(null);
     setSigner(null);
     setStreamCreditContract(null);
+    setCollateralNFT(null);
     setAllAccounts([]);
     console.log('Wallet disconnected');
   }, []);
@@ -212,7 +212,16 @@ export function Web3Provider({ children }) {
       return {
         creditLimit: ethers.formatUnits(info._creditLimit, 6), // USDC has 6 decimals
         borrowed: ethers.formatUnits(info._borrowed, 6),
-        available: ethers.formatUnits(info._available, 6)
+        available: ethers.formatUnits(info._available, 6),
+        interest: ethers.formatUnits(info._interest, 6),
+        commitmentFee: ethers.formatUnits(info._commitmentFee, 6),
+        term: Number(info._term),
+        interestRate: Number(info._interestRate) / 100, // Convert basis points to percentage
+        isEarlyRepayment: info._isEarly,
+        lastFullRepayment: Number(info._lastFullRepayment),
+        canBorrow: info._canBorrow,
+        creditLimitExpiration: Number(info._creditLimitExpiration),
+        daysUntilExpiration: Number(info._daysUntilExpiration)
       };
     } catch (err) {
       console.error('Failed to get account info:', err);
@@ -270,6 +279,17 @@ export function Web3Provider({ children }) {
       console.log('input:', input);
       console.log('revenue:', revenueInUSDC.toString());
 
+      // Try calling static first to catch revert reason
+      try {
+        await streamCreditContract.verifyAndUpdateCredit.staticCall(
+          a, b, c, input, revenueInUSDC
+        );
+        console.log('✅ Static call succeeded - transaction should work');
+      } catch (staticError) {
+        console.error('❌ Static call failed:', staticError);
+        throw new Error(`Contract will revert: ${staticError.message}`);
+      }
+
       const tx = await streamCreditContract.verifyAndUpdateCredit(
         a, b, c, input, revenueInUSDC
       );
@@ -291,16 +311,55 @@ export function Web3Provider({ children }) {
     }
   }, [streamCreditContract]);
 
-  // Borrow from contract
-  const borrow = useCallback(async (amount) => {
-    if (!streamCreditContract) {
-      throw new Error('Contract not initialized');
+  // Get interest rate for a given term
+  const getInterestRate = useCallback(async (termDays) => {
+    if (!streamCreditContract) return 0;
+
+    try {
+      const rate = await streamCreditContract.getInterestRate(termDays);
+      return Number(rate) / 100; // Convert basis points to percentage
+    } catch (err) {
+      console.error('Failed to get interest rate:', err);
+      return 0;
+    }
+  }, [streamCreditContract]);
+
+  // Borrow from contract with term
+  const borrow = useCallback(async (amount, termDays) => {
+    if (!streamCreditContract || !signer) {
+      throw new Error('Contract not initialized or wallet not connected');
     }
 
     try {
       const amountInUSDC = ethers.parseUnits(amount.toString(), 6);
-      const tx = await streamCreditContract.borrow(amountInUSDC);
+      console.log('Borrowing:', ethers.formatUnits(amountInUSDC, 6), 'USDC for', termDays, 'days');
+      
+      const tx = await streamCreditContract.borrow(amountInUSDC, termDays);
+      console.log('Borrow tx submitted:', tx.hash);
+      
       const receipt = await tx.wait();
+      console.log('Borrow confirmed:', receipt);
+      
+      // Save to MongoDB
+      try {
+        const accountInfo = await getAccountInfo();
+        const interestRate = await getInterestRate(termDays);
+        
+        await createLoan({
+          walletAddress: account,
+          principal: parseFloat(amount),
+          termDays: termDays,
+          interestRate: interestRate,
+          borrowTxHash: tx.hash,
+          creditLimitAtBorrow: accountInfo ? parseFloat(accountInfo.creditLimit) : 0,
+          network: 'sepolia'
+        });
+        
+        console.log('✅ Loan saved to database');
+      } catch (dbErr) {
+        console.error('⚠️ Failed to save loan to database:', dbErr);
+        // Don't throw - transaction already succeeded
+      }
       
       return {
         success: true,
@@ -311,18 +370,236 @@ export function Web3Provider({ children }) {
       console.error('Failed to borrow:', err);
       throw err;
     }
-  }, [streamCreditContract]);
+  }, [streamCreditContract, signer, account, getAccountInfo, getInterestRate]);
 
-  // Repay to contract
-  const repay = useCallback(async (amount) => {
-    if (!streamCreditContract) {
-      throw new Error('Contract not initialized');
+  // Repay to contract (supports both partial and full repayment)
+  const repay = useCallback(async (amount = 0) => {
+    if (!streamCreditContract || !signer) {
+      throw new Error('Contract not initialized or wallet not connected');
     }
 
     try {
-      const amountInUSDC = ethers.parseUnits(amount.toString(), 6);
-      const tx = await streamCreditContract.repay(amountInUSDC);
+      // First get account info
+      const accountInfo = await getAccountInfo();
+      if (!accountInfo) throw new Error('Failed to get account info');
+      
+      const principal = parseFloat(accountInfo.borrowed);
+      const interest = parseFloat(accountInfo.interest);
+      const totalDebt = principal + interest;
+      
+      console.log('Total debt:', totalDebt.toFixed(6), 'USDC');
+      console.log('Requested repay amount:', amount === 0 ? 'FULL' : amount.toFixed(6), 'USDC');
+      
+      if (totalDebt === 0) {
+        throw new Error('No active loan to repay');
+      }
+      
+      // Setup USDC contract
+      const usdcContract = new ethers.Contract(
+        CONTRACTS.mockUSDC,
+        [
+          'function approve(address spender, uint256 amount) returns (bool)',
+          'function balanceOf(address account) view returns (uint256)',
+          'function faucet(uint256 amount) external'
+        ],
+        signer
+      );
+      
+      // Check balance
+      const balance = await usdcContract.balanceOf(account);
+      const balanceUSDC = parseFloat(ethers.formatUnits(balance, 6));
+      console.log('Current USDC balance:', balanceUSDC);
+      
+      // Auto-mint USDC with buffer to avoid rounding/approval issues
+      const requiredBalance = totalDebt + 50; // +50 USDC buffer
+      if (balanceUSDC < requiredBalance) {
+        const needed = requiredBalance - balanceUSDC;
+        console.log('Minting', needed.toFixed(2), 'USDC for buffer...');
+        
+        try {
+          const mintTx = await usdcContract.faucet(ethers.parseUnits(needed.toFixed(6), 6));
+          await mintTx.wait();
+          console.log('✅ USDC minted successfully. New balance:', (balanceUSDC + needed).toFixed(2), 'USDC');
+        } catch (mintErr) {
+          console.error('Failed to mint USDC:', mintErr);
+          throw new Error(`Insufficient USDC. Need ~${totalDebt.toFixed(2)} USDC but have ${balanceUSDC.toFixed(2)} USDC. Please get test USDC from faucet.`);
+        }
+      }
+      
+      // Approve unlimited USDC to avoid precision issues
+      console.log('Approving unlimited USDC...');
+      const maxUint256 = ethers.MaxUint256;
+      const approveTx = await usdcContract.approve(CONTRACTS.streamCredit, maxUint256);
+      console.log('Approve tx submitted:', approveTx.hash);
+      await approveTx.wait();
+      console.log('USDC approved');
+      
+      // CRITICAL FIX: Always call repay(0) for full repayment to avoid rounding errors
+      // Contract will calculate exact totalDebt and reset borrowed to 0
+      const repayAmountParam = amount === 0 ? 0 : ethers.parseUnits(amount.toFixed(6), 6);
+      
+      console.log('Repaying loan with amount:', amount === 0 ? '0 (FULL REPAYMENT)' : amount.toFixed(6));
+      const tx = await streamCreditContract.repay(repayAmountParam, { gasLimit: 300000 });
+      console.log('Repay tx submitted:', tx.hash);
+      
       const receipt = await tx.wait();
+      console.log('Repay confirmed:', receipt);
+      
+      // Update loan in MongoDB
+      try {
+        // Find the most recent active loan for this wallet
+        const response = await fetch(`/api/loans?walletAddress=${account}&status=active&limit=1`);
+        if (response.ok) {
+          const { data } = await response.json();
+          if (data && data.length > 0) {
+            const activeLoan = data[0];
+            
+            await updateLoan(activeLoan.loanId, {
+              repayTxHash: tx.hash,
+              interestPaid: parseFloat(interest),
+              principalPaid: parseFloat(principal),
+              totalRepaid: amount === 0 ? totalDebt : amount,
+              earlyRepaymentBonus: accountInfo.isEarlyRepayment,
+              status: amount === 0 ? 'repaid' : 'partial'
+            });
+            
+            console.log('✅ Loan updated in database');
+          }
+        }
+      } catch (dbErr) {
+        console.error('⚠️ Failed to update loan in database:', dbErr);
+        // Don't throw - transaction already succeeded
+      }
+      
+      return {
+        success: true,
+        txHash: tx.hash,
+        receipt,
+        amount: amount === 0 ? totalDebt : amount,
+        isFull: amount === 0
+      };
+    } catch (err) {
+      console.error('Failed to repay:', err);
+      throw err;
+    }
+  }, [streamCreditContract, signer, getAccountInfo, account]);
+
+  // Mint collateral NFT and save to MongoDB
+  const mintCollateral = useCallback(async (assetName, assetType, estimatedValue, description, imageIPFSHash, fileHash, metadataURI, originalFilename, fileSize, mimeType) => {
+    if (!collateralNFT || !signer || !account) {
+      throw new Error('Contract not initialized or wallet not connected');
+    }
+
+    try {
+      const valueInUSDC = Math.floor(parseFloat(estimatedValue) * 1e6);
+      
+      console.log('Minting collateral NFT...');
+      const tx = await collateralNFT.mintCollateral(
+        account,
+        assetName,
+        assetType,
+        valueInUSDC,
+        description,
+        imageIPFSHash,
+        fileHash,
+        metadataURI
+      );
+      
+      console.log('Mint tx submitted:', tx.hash);
+      const receipt = await tx.wait();
+      console.log('Mint confirmed:', receipt);
+      
+      // Extract tokenId from event
+      const mintEvent = receipt.logs.find(log => {
+        try {
+          const parsed = collateralNFT.interface.parseLog(log);
+          return parsed.name === 'CollateralMinted';
+        } catch {
+          return false;
+        }
+      });
+      
+      let tokenId = 'Unknown';
+      if (mintEvent) {
+        const parsed = collateralNFT.interface.parseLog(mintEvent);
+        tokenId = parsed.args.tokenId.toString();
+      }
+      
+      // Save to MongoDB
+      try {
+        const ASSET_TYPES = [
+          { value: 0, label: 'Bất động sản' },
+          { value: 1, label: 'Xe cộ' },
+          { value: 2, label: 'Máy móc thiết bị' },
+          { value: 3, label: 'Hàng tồn kho' },
+          { value: 4, label: 'Tài sản trí tuệ' },
+          { value: 5, label: 'Chứng khoán' },
+          { value: 6, label: 'Khác' }
+        ];
+        
+        await createCollateral({
+          walletAddress: account,
+          tokenId: tokenId,
+          contractAddress: CONTRACTS.collateralNFT,
+          assetName,
+          assetType: assetType,
+          assetTypeLabel: ASSET_TYPES[assetType]?.label || 'Unknown',
+          estimatedValue: valueInUSDC,
+          description,
+          imageIPFSHash,
+          imageURL: `https://${imageIPFSHash}.ipfs.thirdwebstorage.com`,
+          metadataURI,
+          fileSize,
+          mimeType,
+          mintTxHash: tx.hash
+        });
+        
+        console.log('✅ Collateral saved to database');
+      } catch (dbErr) {
+        console.error('⚠️ Failed to save collateral to database:', dbErr);
+        // Don't throw - NFT already minted
+      }
+      
+      return {
+        success: true,
+        txHash: tx.hash,
+        receipt,
+        tokenId
+      };
+    } catch (err) {
+      console.error('Failed to mint collateral:', err);
+      throw err;
+    }
+  }, [collateralNFT, signer, account]);
+
+  // Lock collateral for loan
+  const lockCollateral = useCallback(async (tokenId, loanAmount) => {
+    if (!streamCreditContract || !signer || !account) {
+      throw new Error('Contract not initialized or wallet not connected');
+    }
+
+    try {
+      console.log('Locking collateral tokenId:', tokenId, 'for loan amount:', loanAmount);
+      
+      const tx = await streamCreditContract.lockCollateral(tokenId, ethers.parseUnits(loanAmount.toString(), 6));
+      console.log('Lock tx submitted:', tx.hash);
+      
+      const receipt = await tx.wait();
+      console.log('Lock confirmed:', receipt);
+      
+      // Update in MongoDB
+      try {
+        await updateCollateral(tokenId, {
+          action: 'lock',
+          contractAddress: CONTRACTS.streamCredit,
+          loanAmount: Math.floor(parseFloat(loanAmount) * 1e6),
+          lockTxHash: tx.hash
+        });
+        
+        console.log('✅ Collateral lock status updated in database');
+      } catch (dbErr) {
+        console.error('⚠️ Failed to update collateral in database:', dbErr);
+      }
       
       return {
         success: true,
@@ -330,10 +607,138 @@ export function Web3Provider({ children }) {
         receipt
       };
     } catch (err) {
-      console.error('Failed to repay:', err);
+      console.error('Failed to lock collateral:', err);
       throw err;
     }
-  }, [streamCreditContract]);
+  }, [streamCreditContract, signer, account]);
+
+  // Unlock collateral after loan repaid
+  const unlockCollateral = useCallback(async (tokenId) => {
+    if (!streamCreditContract || !signer || !account) {
+      throw new Error('Contract not initialized or wallet not connected');
+    }
+
+    try {
+      console.log('Unlocking collateral tokenId:', tokenId);
+      
+      const tx = await streamCreditContract.unlockCollateral(tokenId);
+      console.log('Unlock tx submitted:', tx.hash);
+      
+      const receipt = await tx.wait();
+      console.log('Unlock confirmed:', receipt);
+      
+      // Update in MongoDB
+      try {
+        await updateCollateral(tokenId, {
+          action: 'unlock',
+          unlockTxHash: tx.hash
+        });
+        
+        console.log('✅ Collateral unlock status updated in database');
+      } catch (dbErr) {
+        console.error('⚠️ Failed to update collateral in database:', dbErr);
+      }
+      
+      return {
+        success: true,
+        txHash: tx.hash,
+        receipt
+      };
+    } catch (err) {
+      console.error('Failed to unlock collateral:', err);
+      throw err;
+    }
+  }, [streamCreditContract, signer, account]);
+
+  // Pay commitment fee
+  const payCommitmentFee = useCallback(async () => {
+    if (!streamCreditContract || !signer) {
+      throw new Error('Contract not initialized or wallet not connected');
+    }
+
+    try {
+      console.log('🔍 Contract addresses:');
+      console.log('  StreamCredit:', CONTRACTS.streamCredit);
+      console.log('  MockUSDC:', CONTRACTS.mockUSDC);
+      
+      const accountInfo = await getAccountInfo();
+      if (!accountInfo) throw new Error('Failed to get account info');
+      
+      const fee = parseFloat(accountInfo.commitmentFee);
+      console.log('💰 Commitment fee to pay:', fee, 'USDC');
+      
+      if (fee === 0 || isNaN(fee)) {
+        throw new Error('No commitment fee to pay (0 USDC)');
+      }
+      
+      // Check USDC balance first
+      const usdcContract = new ethers.Contract(
+        CONTRACTS.mockUSDC,
+        [
+          'function approve(address spender, uint256 amount) returns (bool)',
+          'function balanceOf(address account) view returns (uint256)',
+          'function allowance(address owner, address spender) view returns (uint256)',
+          'function faucet(uint256 amount) external'
+        ],
+        signer
+      );
+      
+      const balance = await usdcContract.balanceOf(account);
+      const balanceUSDC = parseFloat(ethers.formatUnits(balance, 6));
+      console.log('Your USDC balance:', balanceUSDC);
+      
+      const feeInUSDC = ethers.parseUnits(fee.toFixed(6), 6);
+      
+      // Auto-mint USDC with buffer to avoid rounding/approval issues
+      const requiredBalance = fee + 50; // +50 USDC buffer
+      if (balanceUSDC < requiredBalance) {
+        const needed = requiredBalance - balanceUSDC;
+        console.log('Minting', needed.toFixed(2), 'USDC for buffer...');
+        
+        try {
+          const mintTx = await usdcContract.faucet(ethers.parseUnits(needed.toFixed(6), 6));
+          await mintTx.wait();
+          console.log('✅ USDC minted successfully. New balance:', (balanceUSDC + needed).toFixed(2), 'USDC');
+        } catch (mintErr) {
+          console.error('Failed to mint USDC:', mintErr);
+          throw new Error(`Insufficient USDC balance. Need ${fee.toFixed(6)} USDC but have ${balanceUSDC.toFixed(6)} USDC`);
+        }
+      }
+      
+      // Approve unlimited USDC to avoid precision issues (same as repay)
+      console.log('Approving unlimited USDC...');
+      const maxUint256 = ethers.MaxUint256;
+      const approveTx = await usdcContract.approve(CONTRACTS.streamCredit, maxUint256, { gasLimit: 100000 });
+      console.log('Approve tx submitted:', approveTx.hash);
+      const approveReceipt = await approveTx.wait();
+      console.log('✅ Approve confirmed in block:', approveReceipt.blockNumber);
+      
+      // Verify allowance after approval
+      const allowance = await usdcContract.allowance(account, CONTRACTS.streamCredit);
+      console.log('Current allowance:', ethers.formatUnits(allowance, 6), 'USDC');
+      
+      // Wait a bit to ensure blockchain state is updated
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // Pay fee (with manual gas limit)
+      console.log('Paying commitment fee...');
+      const tx = await streamCreditContract.payCommitmentFee({ gasLimit: 250000 });
+      console.log('Payment tx submitted:', tx.hash);
+      
+      const receipt = await tx.wait();
+      console.log('Payment confirmed:', receipt);
+      
+      return {
+        success: true,
+        txHash: tx.hash,
+        receipt,
+        amount: fee
+      };
+    } catch (err) {
+      console.error('Failed to pay commitment fee:', err);
+      throw err;
+    }
+  }, [streamCreditContract, signer, getAccountInfo, account]);
 
   const value = {
     // State
@@ -353,9 +758,19 @@ export function Web3Provider({ children }) {
     submitZKProof,
     borrow,
     repay,
+    payCommitmentFee,
+    getInterestRate,
+    
+    // Collateral methods
+    mintCollateral,
+    lockCollateral,
+    unlockCollateral,
     
     // Contract
     streamCreditContract,
+    collateralNFT,
+    signer,  // Export signer for direct contract interactions
+    provider,  // Export provider for read operations
     
     // Constants
     contracts: CONTRACTS

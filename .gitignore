@@ -58,3 +58,6 @@ coverage/
 # Misc
 *.bak
 *.tmp
+
+# Local Netlify folder
+.netlify

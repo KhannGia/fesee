@@ -647,7 +647,7 @@ app.post('/api/wallet/update-credit', (req, res) => {
 
 // Generate ZK proof
 app.post('/api/zk/generate-proof', async (req, res) => {
-  const { amounts, transactions, revenueThreshold = 10000, benfordThreshold = 20 } = req.body;
+  const { amounts, transactions, revenueThreshold = 10000, benfordThreshold = 50 } = req.body;
   
   const amountList = amounts || (transactions && transactions.map(t => t.amount)) || [];
 

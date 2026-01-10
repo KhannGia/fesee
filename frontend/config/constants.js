@@ -1,12 +1,13 @@
-// Contract addresses (MockVerifier - FOR TESTING ONLY!)
+// Contract addresses (Collateral NFT System - Sepolia Testnet)
 export const CONTRACTS = {
-  streamCredit: '0xCF2a831E6D389974992F9b4fc20f9B45fDd95475',
-  mockUSDC: '0x25117A7cd454E8C285553f0629696a28bAB3356c',
-  groth16Verifier: '0x1e1247d2458FDb5E82CA7e2dd7A30360E7c399BF'  // MockVerifier - always returns true
+  streamCredit: '0x1B469f87eE19f92e8Cbd6b0A5c64fB42Ed233ace',
+  mockUSDC: '0x5e962b37b7F0fE92C39d6C4d49276dab028CF696',
+  groth16Verifier: '0x1E2905cCc01D83DF8074BdBa8a8bf839B69e6fE3',  // MockVerifier - always returns true
+  collateralNFT: '0xae4857b09B590905A8eFc4AaDa4b169ACe335701'  // Collateral NFT for asset tokenization
 }
 
-// Mock API endpoint
-export const API_BASE_URL = 'http://localhost:3001'
+// Mock API endpoint - Use Render backend
+export const API_BASE_URL = process.env.NEXT_PUBLIC_MOCK_API_URL || 'http://localhost:3001'
 
 // API Endpoints
 export const API_ENDPOINTS = {

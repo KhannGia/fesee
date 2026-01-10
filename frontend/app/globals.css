@@ -80,15 +80,6 @@ body {
     0 4px 30px rgba(0, 0, 0, 0.15);
 }
 
-/* Console specific styles */
-.console-mono {
-  font-family: 'JetBrains Mono', 'Courier New', monospace;
-}
-
-.console-glow {
-  text-shadow: 0 0 10px rgba(34, 211, 238, 0.5);
-}
-
 .leader-card {
   border: 1px solid rgba(34, 211, 238, 0.5);
   background: rgba(30, 41, 59, 0.7);
@@ -343,19 +334,4 @@ input:focus, button:focus {
 .tooltip:hover::after {
   opacity: 1;
   bottom: calc(100% + 8px);
-}
-
-/* Layer utilities */
-@layer utilities {
-  .fade-in {
-    animation: fadeIn 0.6s ease-out;
-  }
-  
-  .slide-up {
-    animation: slideUp 0.6s ease-out;
-  }
-  
-  .btn-action {
-    @apply bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white font-semibold transition-all duration-300;
-  }
 }

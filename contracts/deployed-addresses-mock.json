@@ -1,9 +1,9 @@
 {
   "network": "sepolia",
-  "mockUSDC": "0x25117A7cd454E8C285553f0629696a28bAB3356c",
-  "mockVerifier": "0x1e1247d2458FDb5E82CA7e2dd7A30360E7c399BF",
-  "streamCredit": "0xCF2a831E6D389974992F9b4fc20f9B45fDd95475",
-  "deployer": "0x29BD89bB8Ef465aF61a626d727415C19882b17F3",
-  "deployedAt": "2026-01-03T10:51:49.022Z",
+  "mockUSDC": "0xE4272b80b135d20D3523735aFB86c0541b3cD9Ec",
+  "mockVerifier": "0xf193788c8819BE7B805EFd0C7AcBda177D85Cb63",
+  "streamCredit": "0xd619f5966320A8AF52598ffab33Df1865A23445A",
+  "deployer": "0xd387391F8C5018bb2da4486ed8DC4d1b9fa2705C",
+  "deployedAt": "2026-01-08T16:03:25.483Z",
   "note": "MockVerifier - FOR TESTING ONLY"
 }
