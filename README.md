@@ -46,6 +46,63 @@ Dự án FESEE là một giải pháp tín dụng phi tập trung sử dụng Ze
 - Quản lý collateral NFTs
 - API endpoints cho query nhanh
 - Dashboard analytics
+## 🔄 Kiến trúc hệ thống
+
+The platform operates through a secure, four-step pipeline that ensures data privacy, transparent collateralization, and efficient loan management.
+
+```mermaid
+sequenceDiagram
+    participant Borrower
+    participant Frontend as Next.js App
+    participant ZK as ZK Circuit (Circom)
+    participant IPFS as Thirdweb Storage
+    participant Contract as Lending Smart Contract
+    participant DB as MongoDB Atlas
+
+    %% Step 1: Credit Verification
+    Borrower->>Frontend: Input raw revenue & business data (Off-chain)
+    Frontend->>ZK: Run Benford's Law analysis & Generate Proof
+    ZK-->>Frontend: Return ZK-SNARK Proof (No raw data exposed)
+    
+    %% Step 2: Collateral Tokenization
+    Borrower->>Frontend: Upload collateral documents
+    Frontend->>Frontend: Calculate SHA-256 hash (Duplicate prevention)
+    Frontend->>IPFS: Store files securely
+    IPFS-->>Frontend: Return IPFS URI
+    
+    %% Step 3: Loan Execution
+    Frontend->>Contract: Submit ZK Proof, IPFS URI & Loan Request
+    Contract->>Contract: Verify Proof & Mint ERC-721 Collateral NFT
+    Contract->>Contract: Calculate dynamic interest (7-365 days)
+    Contract-->>Borrower: Disburse USDC (minus 1% commitment fee)
+    
+    %% Step 4: Data Sync & Management
+    Contract->>DB: Sync loan details & NFT metadata via Events
+    DB-->>Frontend: Serve data for Analytics Dashboard (Recharts)
+```
+
+### 📋 Detailed Execution Steps
+
+**1. Zero-Knowledge Credit Verification**
+* The borrower inputs their raw financial and revenue data locally via the frontend.
+* The system applies **Benford's Law** to detect statistical anomalies or potential fraud in the revenue numbers.
+* A cryptographic proof is generated using **ZK-SNARK (Circom + SnarkJS)**. This proof guarantees that the borrower's revenue meets the required credit limit without revealing the actual numbers to the blockchain or the lender.
+
+**2. Collateral NFT Tokenization**
+* The borrower submits details of their physical or financial collateral (e.g., Real Estate, Machinery, Invoices).
+* The system calculates a **SHA-256 file hash** to ensure the collateral has not been submitted previously.
+* Metadata and images are uploaded to decentralized storage via **Thirdweb IPFS**.
+* The smart contract mints a unique **ERC-721 NFT** representing the collateral, locking it within the protocol.
+
+**3. Smart Lending Execution**
+* Once the ZK proof is verified on-chain and the NFT is minted, the borrower requests a loan in **USDC**.
+* The smart contract dynamically calculates the interest rate based on the requested loan term (ranging from 7 to 365 days).
+* A **1% commitment fee** based on the credit limit is deducted, and the remaining USDC is transferred to the borrower's wallet.
+
+**4. Tracking & Repayment (Hybrid Data Model)**
+* Smart contract events are indexed and stored in **MongoDB Atlas** for high-speed querying.
+* The Next.js frontend fetches this data to populate an interactive analytics dashboard (built with Recharts), allowing users to monitor loan statuses, collateral health, and historical data.
+* If the borrower repays the loan early, the smart contract automatically applies an **early repayment bonus** and unlocks the collateral NFT.
 
 ---
 
