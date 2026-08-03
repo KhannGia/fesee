@@ -99,9 +99,8 @@ frontend/
 │   ├── globals.css        # Global styles
 │   └── providers.js       # Web3 provider wrapper
 ├── components/
-│   ├── ProtocolConsole.jsx  # Protocol Console component chính
-│   ├── BenfordChart.js      # Benford chart visualization
-│   └── ZKScripts.js         # ZK proof scripts
+│   ├── LoanManager.js       # Vay, trả nợ, commitment fee
+│   └── CollateralManager.js # Mint và quản lý collateral NFT
 ├── config/
 │   ├── abi.js              # Contract ABIs
 │   └── constants.js        # Contract addresses & constants
