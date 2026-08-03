@@ -1,0 +1,25 @@
+# Keep the build context small — these are all either regenerated inside the
+# container or irrelevant to it.
+node_modules
+**/node_modules
+
+.git
+.claude
+
+frontend/.next
+frontend/out
+contracts/artifacts
+contracts/cache
+contracts/deployed-addresses-*.json
+
+zk-circuit/build
+
+.env
+.env.local
+**/.env
+**/.env.local
+
+*.log
+.DS_Store
+.vscode
+.idea
