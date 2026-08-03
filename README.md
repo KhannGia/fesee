@@ -166,11 +166,12 @@ MONGODB_URI=mongodb+srv://<username>:<password>@cluster.mongodb.net/fesee?retryW
 # Thirdweb IPFS Client ID (Get from: https://thirdweb.com/dashboard/settings/api-keys)
 NEXT_PUBLIC_THIRDWEB_CLIENT_ID=your_thirdweb_client_id
 
-# Contract Addresses (Sepolia Testnet)
-NEXT_PUBLIC_STREAM_CREDIT_ADDRESS=0xD56e705D58F597B448610c17Da11598539917910
-NEXT_PUBLIC_COLLATERAL_NFT_ADDRESS=0xae4857b09B590905A8eFc4AaDa4b169ACe335701
-NEXT_PUBLIC_MOCK_USDC_ADDRESS=0xF2349DF62365B214b5a8BD654D9CD8f47fe26009
-NEXT_PUBLIC_MOCK_VERIFIER_ADDRESS=0x1E2905cCc01D83DF8074BdBa8a8bf839B69e6fE3
+# Contract Addresses — lấy từ contracts/deployed-addresses-<network>.json
+# sau khi chạy scripts/deploy.js
+NEXT_PUBLIC_STREAM_CREDIT_ADDRESS=
+NEXT_PUBLIC_COLLATERAL_NFT_ADDRESS=
+NEXT_PUBLIC_MOCK_USDC_ADDRESS=
+NEXT_PUBLIC_VERIFIER_ADDRESS=
 
 # API Base URL
 NEXT_PUBLIC_API_URL=http://localhost:3000
@@ -198,7 +199,7 @@ ETHERSCAN_API_KEY=your_etherscan_api_key
 ```bash
 cd contracts
 npx hardhat compile
-npx hardhat run scripts/deploy-mock.js --network sepolia
+npx hardhat run scripts/deploy.js --network sepolia
 ```
 
 ### B. Setup MongoDB
@@ -229,14 +230,33 @@ npm start
 
 ##  Smart Contracts
 
-### Deployed Addresses (Sepolia Testnet)
+### Deployed Addresses
 
-| Contract | Address | Purpose |
-|----------|---------|---------|
-| **StreamCredit** | `0xD56e705D58F597B448610c17Da11598539917910` | Lending protocol |
-| **CollateralNFT** | `0xae4857b09B590905A8eFc4AaDa4b169ACe335701` | NFT collateral |
-| **MockUSDC** | `0xF2349DF62365B214b5a8BD654D9CD8f47fe26009` | Test stablecoin |
-| **MockVerifier** | `0x1E2905cCc01D83DF8074BdBa8a8bf839B69e6fE3` | ZK proof verifier |
+> ⚠️ Địa chỉ Sepolia của bản demo cũ đã được gỡ khỏi repo. Deployment đó chạy
+> `MockVerifier` (verifier luôn trả về `true`) và dùng ABI cũ của
+> `verifyAndUpdateCredit`, nên **không tương thích** với contract hiện tại.
+> Cần deploy lại.
+
+`scripts/deploy.js` ghi địa chỉ ra `contracts/deployed-addresses-<network>.json`
+sau mỗi lần chạy:
+
+```bash
+cd contracts
+npx hardhat run scripts/deploy.js                        # hardhat in-process
+npx hardhat run scripts/deploy.js --network localhost    # local node
+npx hardhat run scripts/deploy.js --network sepolia      # Groth16Verifier thật
+```
+
+Trên mạng local script deploy `MockVerifier` để chạy thử không cần proof thật.
+Trên mọi mạng public nó luôn deploy `Groth16Verifier` sinh từ circuit.
+
+| Contract | Purpose |
+|----------|---------|
+| **StreamCredit** | Lending protocol |
+| **CollateralNFT** | NFT collateral |
+| **MockUSDC** | Test stablecoin |
+| **Groth16Verifier** | ZK proof verifier (mạng public) |
+| **MockVerifier** | Verifier giả, chỉ dùng local |
 
 ---
 

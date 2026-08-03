@@ -46,7 +46,7 @@ cd "stream-credit/contracts"
 npx hardhat run scripts/deploy.js --network sepolia
 
 # Hoặc dùng MockVerifier (test nhanh, luôn verify true)
-npx hardhat run scripts/deploy-mock.js --network sepolia
+npx hardhat run scripts/deploy.js --network sepolia
 ```
 Sau khi deploy, cập nhật địa chỉ trong file `frontend/config/constants.js`.
 
@@ -66,11 +66,10 @@ Sau khi deploy, cập nhật địa chỉ trong file `frontend/config/constants.
 - Kiểm tra file `frontend/app/layout.js` phần cấu hình provider
 
 ### 3) snarkjs not loaded
-- Đảm bảo component `frontend/components/ZKScripts.js` được include trong `layout.js` hoặc `page.js`
 - Đợi script load xong rồi mới bấm Generate ZK Proof
 
 ### 4) Transaction reverted
-- Dùng MockVerifier để test nhanh: `npx hardhat run scripts/deploy-mock.js --network sepolia` và cập nhật địa chỉ trong `constants.js`
+- MockVerifier chỉ được deploy trên mạng local; trên Sepolia script luôn deploy `Groth16Verifier` thật
 - Verifier thật phải khớp với `verification_key.json` trong `frontend/public/zk`
 
 ### 5) Wash Trader vẫn được duyệt

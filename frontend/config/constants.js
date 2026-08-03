@@ -1,9 +1,20 @@
-// Contract addresses (Collateral NFT System - Sepolia Testnet)
+// Contract addresses come from the environment so a redeploy never needs a
+// source edit. Copy them out of contracts/deployed-addresses-<network>.json
+// into frontend/.env.local after running scripts/deploy.js.
 export const CONTRACTS = {
-  streamCredit: '0x1B469f87eE19f92e8Cbd6b0A5c64fB42Ed233ace',
-  mockUSDC: '0x5e962b37b7F0fE92C39d6C4d49276dab028CF696',
-  groth16Verifier: '0x1E2905cCc01D83DF8074BdBa8a8bf839B69e6fE3',  // MockVerifier - always returns true
-  collateralNFT: '0xae4857b09B590905A8eFc4AaDa4b169ACe335701'  // Collateral NFT for asset tokenization
+  streamCredit: process.env.NEXT_PUBLIC_STREAM_CREDIT_ADDRESS || '',
+  mockUSDC: process.env.NEXT_PUBLIC_MOCK_USDC_ADDRESS || '',
+  collateralNFT: process.env.NEXT_PUBLIC_COLLATERAL_NFT_ADDRESS || '',
+}
+
+/**
+ * Addresses that are missing from the environment. The app uses this to fail
+ * loudly rather than sending transactions to the zero address.
+ */
+export function missingContractAddresses() {
+  return Object.entries(CONTRACTS)
+    .filter(([, address]) => !address)
+    .map(([name]) => name)
 }
 
 // Mock API endpoint - Use Render backend
@@ -78,9 +89,16 @@ export const SCENARIOS = {
 }
 
 // Lending parameters
+// Mirrors the constants in StreamCredit.sol — keep both in sync.
 export const LENDING_PARAMS = {
-  CREDIT_RATIO: 30, // 30% of revenue
-  REVENUE_THRESHOLD: 1000, // $1k minimum
-  FRAUD_THRESHOLD: 20, // 20 Benford score threshold (chi-square divergence)
-  INTEREST_RATE: 12, // 12% APR
+  CREDIT_RATIO: 30, // CREDIT_RATIO: credit limit = 30% of proven revenue
+  REVENUE_THRESHOLD: 1000, // minProvenRevenue, in USDC
+  FRAUD_THRESHOLD: 20, // maxBenfordThreshold, rejected above this
+  // Reverse interest curve: APR (%) by loan term, not a single flat rate.
+  INTEREST_RATES: [
+    { maxDays: 30, apr: 5 },
+    { maxDays: 90, apr: 8 },
+    { maxDays: 180, apr: 15 },
+    { maxDays: 365, apr: 25 },
+  ],
 }

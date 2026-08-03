@@ -78,7 +78,7 @@ echo.
 echo ========================================
 echo Step 4: Deploying Contracts
 echo ========================================
-call npx hardhat run scripts/deploy-local.js --network localhost
+call npx hardhat run scripts/deploy.js --network localhost
 if %ERRORLEVEL% NEQ 0 (
     echo ERROR: Deployment failed!
     echo Make sure Hardhat node is running

@@ -38,7 +38,7 @@ echo.
 echo Deploying to Hardhat Local Network...
 echo Make sure Hardhat node is running: npx hardhat node
 pause
-call npx hardhat run scripts/deploy-local.js --network localhost
+call npx hardhat run scripts/deploy.js --network localhost
 goto :success
 
 :sepolia
@@ -49,7 +49,7 @@ echo - SEPOLIA_RPC_URL
 echo - PRIVATE_KEY
 echo - ETHERSCAN_API_KEY
 pause
-call npx hardhat run scripts/deploy-mock.js --network sepolia
+call npx hardhat run scripts/deploy.js --network sepolia
 goto :success
 
 :success

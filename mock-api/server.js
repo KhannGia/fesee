@@ -708,10 +708,24 @@ app.post('/api/zk/generate-proof', async (req, res) => {
     timestamp: Math.floor(Date.now() / 1000)
   };
 
+  // Public signals in the exact order StreamCredit.verifyAndUpdateCredit expects:
+  // [isValid, revenueThreshold, benfordThreshold]. The threshold is scaled to
+  // USDC's 6 decimals because the contract derives the credit limit from it.
+  const publicSignals = [
+    '1',
+    (BigInt(Math.round(revenueThreshold)) * 1000000n).toString(),
+    String(benfordThreshold)
+  ];
+
   res.json({
     success: true,
+    // NOTE: this proof is randomly generated, not a real Groth16 proof. It only
+    // passes against MockVerifier on a local chain. Any network running the real
+    // Groth16Verifier will reject it — generate proofs with snarkjs instead.
+    simulated: true,
     proof: mockProof,
     publicInputs,
+    publicSignals,
     analysis: {
       totalRevenue: Math.round(totalRevenue),
       benfordScore: benford.fraudProbability,

@@ -3,27 +3,24 @@ pragma solidity ^0.8.20;
 
 /**
  * @title MockVerifier
- * @notice Mock verifier cho testing (thay thế ZK verifier thật)
- * NOTE: Trong production, file này sẽ được thay bằng Verifier.sol từ ZK circuit
+ * @notice Verifier giả cho unit test, có cùng chữ ký với `Verifier.sol` sinh từ circuit.
+ * @dev CHỈ dùng cho test và local node. Trên testnet/mainnet phải deploy `Verifier.sol`
+ *      thật — deploy script sẽ từ chối dùng contract này ngoài mạng local.
  */
 contract MockVerifier {
-    // For testing, always return true
-    bool public alwaysPass = true;
-    
+    /// @notice Kết quả verify trả về, đặt bằng `setShouldVerify` trong test.
+    bool public shouldVerify = true;
+
     function verifyProof(
         uint[2] memory,
         uint[2][2] memory,
         uint[2] memory,
-        uint[1] memory input
+        uint[3] memory
     ) external view returns (bool) {
-        if (alwaysPass) {
-            return true;
-        }
-        // In real scenario, check if input[0] == 1 (proof is valid)
-        return input[0] == 1;
+        return shouldVerify;
     }
-    
-    function setAlwaysPass(bool _alwaysPass) external {
-        alwaysPass = _alwaysPass;
+
+    function setShouldVerify(bool _shouldVerify) external {
+        shouldVerify = _shouldVerify;
     }
 }
