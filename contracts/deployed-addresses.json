@@ -1,8 +1,0 @@
-{
-  "network": "sepolia",
-  "mockUSDC": "0x2b1561Ef1C3bE02180A32E7aae6A7566Ed8F27a8",
-  "groth16Verifier": "0xCAecEC1e406B524fDa7C29424AEcD5dB6FBa896b",
-  "streamCredit": "0x2F90F76F1D3fCD66c92Ab00DCDa1e7C5A61200b9",
-  "deployer": "0x29BD89bB8Ef465aF61a626d727415C19882b17F3",
-  "deployedAt": "2026-01-03T11:12:37.549Z"
-}
