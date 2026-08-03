@@ -1,13 +1,13 @@
 # Pinned so the volume and container names do not change with the directory
 # compose happens to be run from.
-name: fesee
+name: streamcredit
 
 services:
   dev:
     build:
       context: .
       dockerfile: Dockerfile.dev
-    container_name: fesee-dev
+    container_name: streamcredit-dev
     working_dir: /workspace
     volumes:
       - .:/workspace
@@ -28,7 +28,7 @@ services:
       # needed for local development. Next.js does not override variables that
       # are already set, so this wins over frontend/.env.local — comment it out
       # if you want to point at Atlas instead.
-      MONGODB_URI: mongodb://mongo:27017/fesee
+      MONGODB_URI: mongodb://mongo:27017/streamcredit
       # Next.js in Docker needs polling to see host file edits.
       WATCHPACK_POLLING: "true"
       CHOKIDAR_USEPOLLING: "true"
@@ -39,7 +39,7 @@ services:
 
   mongo:
     image: mongo:7
-    container_name: fesee-mongo
+    container_name: streamcredit-mongo
     volumes:
       - mongo_data:/data/db
     ports:

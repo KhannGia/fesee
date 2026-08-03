@@ -3,21 +3,27 @@
 Tài liệu này hướng dẫn nhanh cách chạy web (Next.js) và Mock API server (Node.js) trên máy của bạn.
 
 ## Yêu cầu môi trường
-- Node.js 18+
-- npm (hoặc yarn)
+- Docker (cách được khuyến nghị), hoặc Node.js 18+ nếu chạy trực tiếp trên máy
 - MetaMask (đang ở mạng Sepolia)
 
-## Cách nhanh nhất (Windows)
-Nếu muốn chạy mọi thứ chỉ với 1 thao tác:
+## Cách nhanh nhất — Docker
+Không cần cài Node hay MongoDB lên máy:
 
-```powershell
-# Trong thư mục stream-credit
-./start.bat
+```bash
+docker compose up -d
+docker compose exec dev bash
 ```
 
-Script sẽ tự mở 2 terminal: 1 cho Mock API (port 3001) và 1 cho Frontend (port 3000).
+Rồi trong container:
 
-## Cách thủ công (khuyến nghị cho dev)
+```bash
+cd mock-api && npm start     # port 3001
+cd frontend && npm run dev   # port 3000
+```
+
+Chi tiết xem [DOCKER.md](DOCKER.md).
+
+## Cách thủ công (chạy trực tiếp trên máy)
 ### 1) Khởi động Mock API (port 3001)
 ```powershell
 cd "stream-credit/mock-api"

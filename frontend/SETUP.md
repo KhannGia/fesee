@@ -214,16 +214,6 @@ npm i -g vercel
 vercel
 ```
 
-### Netlify:
-
-```bash
-# Build command
-npm run build
-
-# Publish directory
-.next
-```
-
 ## 📊 Performance Tips
 
 1. **Images**: Sử dụng Next.js Image component

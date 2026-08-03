@@ -172,7 +172,7 @@ cd ../mock-api && npm install
 
 ```env
 # MongoDB Connection
-MONGODB_URI=mongodb+srv://<username>:<password>@cluster.mongodb.net/fesee?retryWrites=true&w=majority
+MONGODB_URI=mongodb+srv://<username>:<password>@cluster.mongodb.net/streamcredit?retryWrites=true&w=majority
 
 # Thirdweb IPFS Client ID (Get from: https://thirdweb.com/dashboard/settings/api-keys)
 NEXT_PUBLIC_THIRDWEB_CLIENT_ID=your_thirdweb_client_id
