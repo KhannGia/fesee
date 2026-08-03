@@ -1,3 +1,7 @@
+# Pinned so the volume and container names do not change with the directory
+# compose happens to be run from.
+name: fesee
+
 services:
   dev:
     build:
