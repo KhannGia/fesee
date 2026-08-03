@@ -616,15 +616,17 @@ const ConsoleView = ({ onNavigate, web3 }) => {
         body: JSON.stringify({
           amounts,
           revenueThreshold: 10000,
-          benfordThreshold: 50
+          // Must stay within StreamCredit's maxBenfordThreshold, or the
+          // contract rejects the proof as too permissive.
+          benfordThreshold: 20
         })
       });
-      
+
       const proofData = await proofResponse.json();
-      
+
       if (proofData.success) {
         setZkProof(proofData.proof);
-        setPublicSignals(proofData.publicInputs);
+        setPublicSignals(proofData.publicSignals);
         setTotalRevenue(proofData.analysis.totalRevenue);
         setStep(3);
         addLog(`ZK Proof generated in ${proofData.generationTimeMs.toFixed(0)}ms ✅`, 'success');
@@ -679,30 +681,23 @@ const ConsoleView = ({ onNavigate, web3 }) => {
     
     try {
       // Submit to real contract
-      const result = await submitZKProof(zkProof, publicSignals, totalRevenue);
+      const result = await submitZKProof(zkProof, publicSignals);
       
       if (result.success) {
         setLastTxHash(result.txHash);
         addLog(`✅ Transaction confirmed!`, 'success');
         addLog(`TxHash: ${result.txHash}`, 'success');
         
-        // Calculate credit limit (30% of revenue)
-        const newCreditLimit = Math.round(totalRevenue * 0.3);
-        
-        // Update local state immediately
-        setCreditLimit(newCreditLimit);
-        setBorrowed(0);
-        addLog(`💳 Credit Limit Updated: $${newCreditLimit.toLocaleString()}`, 'success');
-        
-        // Try to refresh from on-chain (may take a moment)
-        setTimeout(async () => {
-          try {
-            await loadAccountInfo();
-          } catch (e) {
-            console.log('On-chain read delayed, using local state');
-          }
-        }, 2000);
-        
+        // The contract is the source of truth for the limit it just granted,
+        // so read it back rather than recomputing the formula here.
+        try {
+          await loadAccountInfo();
+          addLog(`💳 Credit limit updated on-chain`, 'success');
+        } catch (e) {
+          console.error('Failed to read account info after verification:', e);
+          addLog(`⚠️ Verified on-chain, but reading the new limit failed — refresh to see it`, 'info');
+        }
+
         setStep(4);
         alert("🎉 ZK Proof verified on-chain! Credit Limit Updated!");
       }

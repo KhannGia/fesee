@@ -8,7 +8,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { ethers } from 'ethers';
 import { STREAM_CREDIT_ABI, COLLATERAL_NFT_ABI } from '../config/abi';
-import { CONTRACTS } from '../config/constants';
+import { CONTRACTS, missingContractAddresses } from '../config/constants';
 import { createLoan, updateLoan } from '../hooks/useLoanHistory';
 import { createCollateral, updateCollateral } from '../hooks/useCollateralHistory';
 
@@ -73,21 +73,26 @@ export function Web3Provider({ children }) {
 
   // Initialize contracts when signer is available
   useEffect(() => {
-    if (signer) {
-      const streamContract = new ethers.Contract(
-        CONTRACTS.streamCredit,
-        STREAM_CREDIT_ABI,
-        signer
-      );
-      setStreamCreditContract(streamContract);
-      
-      const collateralContract = new ethers.Contract(
-        CONTRACTS.collateralNFT,
-        COLLATERAL_NFT_ABI,
-        signer
-      );
-      setCollateralNFT(collateralContract);
+    if (!signer) return;
+
+    // Without addresses every call would silently go to 0x0, so surface the
+    // misconfiguration instead of letting the UI look connected.
+    const missing = missingContractAddresses();
+    if (missing.length > 0) {
+      const message = `Missing contract addresses in .env.local: ${missing
+        .map((name) => `NEXT_PUBLIC_${name.replace(/([A-Z])/g, '_$1').toUpperCase()}_ADDRESS`)
+        .join(', ')}. Deploy with contracts/scripts/deploy.js and copy the results in.`;
+      console.error(message);
+      setError(message);
+      return;
     }
+
+    setStreamCreditContract(
+      new ethers.Contract(CONTRACTS.streamCredit, STREAM_CREDIT_ABI, signer)
+    );
+    setCollateralNFT(
+      new ethers.Contract(CONTRACTS.collateralNFT, COLLATERAL_NFT_ABI, signer)
+    );
   }, [signer]);
 
   // Update signer when account changes
@@ -229,69 +234,56 @@ export function Web3Provider({ children }) {
     }
   }, [streamCreditContract, account]);
 
-  // Submit ZK proof to contract
-  const submitZKProof = useCallback(async (proof, publicSignals, revenue) => {
+  // Submit ZK proof to contract.
+  //
+  // The credit limit is derived on-chain from `publicSignals[1]`
+  // (revenueThreshold), which is bound into the proof. Nothing about the
+  // revenue is passed separately — the borrower cannot inflate it.
+  const submitZKProof = useCallback(async (proof, publicSignals) => {
     if (!streamCreditContract) {
       throw new Error('Contract not initialized. Please connect wallet first.');
     }
 
+    if (!Array.isArray(publicSignals) || publicSignals.length !== 3) {
+      throw new Error(
+        `Expected 3 public signals [isValid, revenueThreshold, benfordThreshold], got ${publicSignals?.length ?? 0}`
+      );
+    }
+
+    if (!proof?.pi_a || !proof?.pi_b || !proof?.pi_c) {
+      throw new Error('Malformed Groth16 proof: missing pi_a / pi_b / pi_c');
+    }
+
     try {
-      // For MockVerifier, we can send any valid uint256 values
-      // The proof format from mock API uses hex strings, convert to BigInt
-      const parseHexOrNumber = (val) => {
-        if (typeof val === 'string' && val.startsWith('0x')) {
-          // Truncate to valid uint256 range
-          return BigInt(val.slice(0, 66));
-        }
-        return BigInt(val || '0');
-      };
+      const a = [BigInt(proof.pi_a[0]), BigInt(proof.pi_a[1])];
 
-      // Parse proof components
-      const a = [
-        parseHexOrNumber(proof.pi_a?.[0] || '1'),
-        parseHexOrNumber(proof.pi_a?.[1] || '2')
-      ];
+      // snarkjs emits the G2 point with its coordinates in the opposite order
+      // to what the Solidity pairing check expects, so each pair is swapped.
       const b = [
-        [
-          parseHexOrNumber(proof.pi_b?.[0]?.[0] || '1'),
-          parseHexOrNumber(proof.pi_b?.[0]?.[1] || '2')
-        ],
-        [
-          parseHexOrNumber(proof.pi_b?.[1]?.[0] || '3'),
-          parseHexOrNumber(proof.pi_b?.[1]?.[1] || '4')
-        ]
+        [BigInt(proof.pi_b[0][1]), BigInt(proof.pi_b[0][0])],
+        [BigInt(proof.pi_b[1][1]), BigInt(proof.pi_b[1][0])]
       ];
-      const c = [
-        parseHexOrNumber(proof.pi_c?.[0] || '1'),
-        parseHexOrNumber(proof.pi_c?.[1] || '2')
-      ];
-      
-      // input[0] should be 1 (isValid = true)
-      const input = [BigInt(1)];
 
-      // Convert revenue to USDC format (6 decimals)
-      const revenueInUSDC = ethers.parseUnits(revenue.toString(), 6);
+      const c = [BigInt(proof.pi_c[0]), BigInt(proof.pi_c[1])];
+
+      const pubSignals = publicSignals.map((signal) => BigInt(signal));
 
       console.log('Submitting ZK proof to contract...');
-      console.log('a:', a);
-      console.log('b:', b);
-      console.log('c:', c);
-      console.log('input:', input);
-      console.log('revenue:', revenueInUSDC.toString());
+      console.log('publicSignals:', pubSignals.map(String));
 
       // Try calling static first to catch revert reason
       try {
         await streamCreditContract.verifyAndUpdateCredit.staticCall(
-          a, b, c, input, revenueInUSDC
+          a, b, c, pubSignals
         );
         console.log('✅ Static call succeeded - transaction should work');
       } catch (staticError) {
         console.error('❌ Static call failed:', staticError);
-        throw new Error(`Contract will revert: ${staticError.message}`);
+        throw new Error(`Contract will revert: ${staticError.reason || staticError.message}`);
       }
 
       const tx = await streamCreditContract.verifyAndUpdateCredit(
-        a, b, c, input, revenueInUSDC
+        a, b, c, pubSignals
       );
 
       console.log('Transaction submitted:', tx.hash);
@@ -399,37 +391,30 @@ export function Web3Provider({ children }) {
         CONTRACTS.mockUSDC,
         [
           'function approve(address spender, uint256 amount) returns (bool)',
-          'function balanceOf(address account) view returns (uint256)',
-          'function faucet(uint256 amount) external'
+          'function balanceOf(address account) view returns (uint256)'
         ],
         signer
       );
-      
-      // Check balance
+
+      // The borrower must actually hold the funds to settle the debt; the app
+      // no longer mints USDC on their behalf.
       const balance = await usdcContract.balanceOf(account);
       const balanceUSDC = parseFloat(ethers.formatUnits(balance, 6));
       console.log('Current USDC balance:', balanceUSDC);
-      
-      // Auto-mint USDC with buffer to avoid rounding/approval issues
-      const requiredBalance = totalDebt + 50; // +50 USDC buffer
-      if (balanceUSDC < requiredBalance) {
-        const needed = requiredBalance - balanceUSDC;
-        console.log('Minting', needed.toFixed(2), 'USDC for buffer...');
-        
-        try {
-          const mintTx = await usdcContract.faucet(ethers.parseUnits(needed.toFixed(6), 6));
-          await mintTx.wait();
-          console.log('✅ USDC minted successfully. New balance:', (balanceUSDC + needed).toFixed(2), 'USDC');
-        } catch (mintErr) {
-          console.error('Failed to mint USDC:', mintErr);
-          throw new Error(`Insufficient USDC. Need ~${totalDebt.toFixed(2)} USDC but have ${balanceUSDC.toFixed(2)} USDC. Please get test USDC from faucet.`);
-        }
+
+      const amountDue = amount === 0 ? totalDebt : amount;
+
+      if (balanceUSDC < amountDue) {
+        throw new Error(
+          `Insufficient USDC: need ${amountDue.toFixed(2)} but hold ${balanceUSDC.toFixed(2)}. Top up from the testnet faucet first.`
+        );
       }
-      
-      // Approve unlimited USDC to avoid precision issues
-      console.log('Approving unlimited USDC...');
-      const maxUint256 = ethers.MaxUint256;
-      const approveTx = await usdcContract.approve(CONTRACTS.streamCredit, maxUint256);
+
+      // Approve exactly what this repayment needs, with a small margin for the
+      // interest that accrues between this call and the repay transaction.
+      const approvalAmount = ethers.parseUnits((amountDue * 1.001).toFixed(6), 6);
+      console.log('Approving', ethers.formatUnits(approvalAmount, 6), 'USDC...');
+      const approveTx = await usdcContract.approve(CONTRACTS.streamCredit, approvalAmount);
       console.log('Approve tx submitted:', approveTx.hash);
       await approveTx.wait();
       console.log('USDC approved');
@@ -677,38 +662,27 @@ export function Web3Provider({ children }) {
         [
           'function approve(address spender, uint256 amount) returns (bool)',
           'function balanceOf(address account) view returns (uint256)',
-          'function allowance(address owner, address spender) view returns (uint256)',
-          'function faucet(uint256 amount) external'
+          'function allowance(address owner, address spender) view returns (uint256)'
         ],
         signer
       );
-      
+
       const balance = await usdcContract.balanceOf(account);
       const balanceUSDC = parseFloat(ethers.formatUnits(balance, 6));
       console.log('Your USDC balance:', balanceUSDC);
-      
+
       const feeInUSDC = ethers.parseUnits(fee.toFixed(6), 6);
-      
-      // Auto-mint USDC with buffer to avoid rounding/approval issues
-      const requiredBalance = fee + 50; // +50 USDC buffer
-      if (balanceUSDC < requiredBalance) {
-        const needed = requiredBalance - balanceUSDC;
-        console.log('Minting', needed.toFixed(2), 'USDC for buffer...');
-        
-        try {
-          const mintTx = await usdcContract.faucet(ethers.parseUnits(needed.toFixed(6), 6));
-          await mintTx.wait();
-          console.log('✅ USDC minted successfully. New balance:', (balanceUSDC + needed).toFixed(2), 'USDC');
-        } catch (mintErr) {
-          console.error('Failed to mint USDC:', mintErr);
-          throw new Error(`Insufficient USDC balance. Need ${fee.toFixed(6)} USDC but have ${balanceUSDC.toFixed(6)} USDC`);
-        }
+
+      if (balanceUSDC < fee) {
+        throw new Error(
+          `Insufficient USDC: fee is ${fee.toFixed(6)} but you hold ${balanceUSDC.toFixed(6)}. Top up from the testnet faucet first.`
+        );
       }
-      
-      // Approve unlimited USDC to avoid precision issues (same as repay)
-      console.log('Approving unlimited USDC...');
-      const maxUint256 = ethers.MaxUint256;
-      const approveTx = await usdcContract.approve(CONTRACTS.streamCredit, maxUint256, { gasLimit: 100000 });
+
+      // Approve just this fee, plus a margin for what accrues before the tx lands.
+      const approvalAmount = ethers.parseUnits((fee * 1.001).toFixed(6), 6);
+      console.log('Approving', ethers.formatUnits(approvalAmount, 6), 'USDC...');
+      const approveTx = await usdcContract.approve(CONTRACTS.streamCredit, approvalAmount, { gasLimit: 100000 });
       console.log('Approve tx submitted:', approveTx.hash);
       const approveReceipt = await approveTx.wait();
       console.log('✅ Approve confirmed in block:', approveReceipt.blockNumber);
