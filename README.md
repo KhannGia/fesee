@@ -143,17 +143,28 @@ cd fesee-main
 
 ### 2. Cài đặt Dependencies
 
-#### Smart Contracts
+**Cách được khuyến nghị — Docker** (không cài gì lên host, kèm sẵn MongoDB):
+
 ```bash
-cd contracts
-npm install
+docker compose up -d --build
+docker compose exec dev bash
+npm run install:all
 ```
 
-#### Frontend
+Chi tiết xem [DOCKER.md](DOCKER.md).
+
+<details>
+<summary>Hoặc cài trực tiếp lên host</summary>
+
+Cần Node.js >= 18 và một MongoDB instance.
+
 ```bash
-cd frontend
-npm install
+cd contracts && npm install
+cd ../frontend && npm install
+cd ../mock-api && npm install
 ```
+
+</details>
 
 ### 3. Cấu hình Environment Variables
 

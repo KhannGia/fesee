@@ -1,0 +1,51 @@
+services:
+  dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: fesee-dev
+    working_dir: /workspace
+    volumes:
+      - .:/workspace
+      # node_modules live in named volumes so they never land on the host, and
+      # so Linux-built native modules are not mixed with anything host-side.
+      - root_node_modules:/workspace/node_modules
+      - contracts_node_modules:/workspace/contracts/node_modules
+      - frontend_node_modules:/workspace/frontend/node_modules
+      - mock_api_node_modules:/workspace/mock-api/node_modules
+      # Next.js build output is large and container-specific.
+      - frontend_next:/workspace/frontend/.next
+    ports:
+      - "3000:3000"   # Next.js dev server
+      - "3001:3001"   # mock-api
+      - "8545:8545"   # hardhat node
+    environment:
+      # Points at the mongo service below, so no MongoDB Atlas account is
+      # needed for local development. Next.js does not override variables that
+      # are already set, so this wins over frontend/.env.local — comment it out
+      # if you want to point at Atlas instead.
+      MONGODB_URI: mongodb://mongo:27017/fesee
+      # Next.js in Docker needs polling to see host file edits.
+      WATCHPACK_POLLING: "true"
+      CHOKIDAR_USEPOLLING: "true"
+    depends_on:
+      - mongo
+    stdin_open: true
+    tty: true
+
+  mongo:
+    image: mongo:7
+    container_name: fesee-mongo
+    volumes:
+      - mongo_data:/data/db
+    ports:
+      # Exposed so host tools such as MongoDB Compass can connect.
+      - "27017:27017"
+
+volumes:
+  root_node_modules:
+  contracts_node_modules:
+  frontend_node_modules:
+  mock_api_node_modules:
+  frontend_next:
+  mongo_data:
